@@ -1,10 +1,9 @@
 
 import streamlit as st
-import urllib.parse
+import urllib.parse, pandas as pd
 
 st.set_page_config(page_title="Sahara UK Foods - Cheapest Haulier AI", layout="wide")
-
-st.markdown("<h1 style='color:#E65100'>🧡 Sahara UK Foods — Cheapest Haulier AI</h1><p>Logistics Manager - Ali | 3 Ports • 14 Warehouses • Emails + Outlook Draft</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='color:#E65100'>🧡 Sahara UK Foods — Cheapest Haulier AI</h1><p>Logistics Manager - Ali | 3 Ports • 14 Warehouses • Rates + Emails + Outlook</p>", unsafe_allow_html=True)
 
 WAREHOUSES = {
     "PE2 7LB - JSD warehouse": "JSD Warehouse, Peterborough, PE2 7LB, UK",
@@ -22,48 +21,109 @@ WAREHOUSES = {
     "PE34 3LW - Golden Sunrise": "Golden Sunrise, Kings Lynn, PE34 3LW, UK",
     "S80 1RF - Withworth": "Withworth, Worksop, S80 1RF, UK",
 }
+PORTS = ["Felixstowe","Southampton","London Gateway"]
 
-HAULIERS = [
-    ("Palletways","customer_care@palletways.com","UK Pallet"),
-    ("TPN - The Pallet Network","mail@tpnmail.co.uk","UK Pallet"),
-    ("Pall-Ex","info@pallex.com","UK Pallet / FTL"),
-    ("Palletforce","info@palletforce.com","UK Pallet"),
-    ("Armour Transport","enquiries@armourtransport.co.uk","Container"),
-    ("Seven Logistics","bookings@seven-logistics.co.uk","Container"),
-    ("Clintopia","info@clintopia.co.uk","Container"),
-    ("Emirates Logistics","info@emirateslogistics.co.uk","Container"),
-    ("Freightways","sales@freightways.co.uk","Container"),
-    ("Jagelo Haulage","info@jhaulage.co.uk","Container"),
-    ("Barrington Freight","sales@barringtonfreight.co.uk","NI / Ireland / Europe"),
-    ("Direct Loads","info@directloads.co.uk","NI / Ireland"),
-    ("Gemini Logistics","info@geminilogistics.co.uk","NI / Ireland"),
-    ("Trailer Freight","info@trailerfreight.com","NI"),
-    ("PW Freight","info@pwfreight.com","NI / Ireland"),
-    ("LIF Lanigan","info@laniganfreight.com","NI / Ireland / Europe"),
-]
+# RATES DATABASE - editable base rates (market cheapest slabs, user can change)
+if "rates" not in st.session_state:
+    st.session_state.rates = pd.DataFrame([
+        ["TPN - The Pallet Network","mail@tpnmail.co.uk","UK Pallet",42, "per pallet","Next Day"],
+        ["Palletways","customer_care@palletways.com","UK Pallet",45, "per pallet","Next Day"],
+        ["Pall-Ex","info@pallex.com","UK Pallet",44, "per pallet","Next Day"],
+        ["Palletforce","info@palletforce.com","UK Pallet",46, "per pallet","Next Day"],
+        ["Armour Transport","enquiries@armourtransport.co.uk","Container 40FT",420, "per container","Port to Warehouse"],
+        ["Seven Logistics","bookings@seven-logistics.co.uk","Container 40FT",450, "per container","Port to Warehouse"],
+        ["Clintopia","info@clintopia.co.uk","Container 40FT",430, "per container","Port to Warehouse"],
+        ["Emirates Logistics","info@emirateslogistics.co.uk","Container 40FT",440, "per container","Port to Warehouse"],
+        ["Freightways","sales@freightways.co.uk","Container 40FT",410, "per container","Port to Warehouse"],
+        ["Barrington Freight","sales@barringtonfreight.co.uk","NI / Ireland Pallet",225, "per pallet","24-48h"],
+        ["Direct Loads","info@directloads.co.uk","NI / Ireland Pallet",240, "per pallet","Dedicated"],
+        ["Gemini Logistics","info@geminilogistics.co.uk","NI / Ireland Pallet",230, "per pallet","24h"],
+        ["Pall-Ex Logistics","info@pallex.com","FTL Full Trailer",750, "per FTL","UK-wide"],
+        ["Road Haulage Services","info@roadhaulageservices.com","FTL Full Trailer",820, "per FTL","UK-wide"],
+        ["Palletways Europe","customer_care@palletways.com","UK to Europe Pallet",65, "per pallet","EU"],
+        ["Barrington Freight EU","sales@barringtonfreight.co.uk","UK to Europe Pallet",70, "per pallet","EU"],
+    ], columns=["Haulier","Email","Service","Rate £","Unit","Transit"])
 
-# Top buttons - anchor navigation via tabs
-tab1, tab2, tab3, tab4 = st.tabs(["📧 Container Email","🇬🇧 NI / Ireland Email","📦 UK Pallet Email","📩 All Haulier Emails"])
+tab_rates, tab1, tab2, tab3, tab4 = st.tabs(["💷 1. RATES DEKHO - Cheapest Nikalo","📧 2. Container Email","🇬🇧 3. NI / Ireland Email","📦 4. UK Pallet Email","📩 5. All Haulier Emails"])
+
+with tab_rates:
+    st.subheader("Step 1: Pehle Rates Dekho - Phir Email Karo")
+    st.info("👉 Kaise kaam karta hai: Neeche From / To / Pallets / Weight dalo → Sabse sasta haulier uppar aa jayega → Uske neeche wale 'Email This Haulier' button se usi rate ke saath email ban jayegi. Product / Weight / Pallets har dafa change ho sakte hain, rate auto-update ho jayega.")
+    colA,colB,colC,colD = st.columns(4)
+    with colA:
+        from_loc = st.selectbox("From", PORTS + list(WAREHOUSES.keys()), index=2)
+        service = st.selectbox("Service Type", ["UK Pallet","Container 40FT","NI / Ireland Pallet","FTL Full Trailer","UK to Europe Pallet"])
+    with colB:
+        to_loc = st.selectbox("To", list(WAREHOUSES.keys()), index=1)
+    with colC:
+        pallets = st.number_input("No. of Pallets (agar pallet hai)", min_value=1, value=1)
+        weight = st.number_input("Total Weight MT", min_value=0.1, value=0.48)
+    with colD:
+        product_r = st.text_input("Product (email me jayega)", "Org. Chopped Aseel Dates")
+        st.write("")
+
+    # Filter rates by service
+    filtered = st.session_state.rates[st.session_state.rates["Service"]==service].copy()
+    # Calculate total
+    if "Pallet" in service:
+        filtered["Total £"] = filtered["Rate £"] * pallets
+    elif "Container" in service:
+        filtered["Total £"] = filtered["Rate £"]
+    elif "FTL" in service:
+        filtered["Total £"] = filtered["Rate £"]
+    filtered = filtered.sort_values("Total £")
+    filtered["From"] = from_loc
+    filtered["To"] = to_loc
+    filtered["Product"] = product_r
+
+    st.markdown("### 🏆 Cheapest to Expensive - Rates Table")
+    st.dataframe(filtered[["Haulier","Email","Service","Rate £","Unit","Total £","Transit"]], use_container_width=True)
+
+    if len(filtered)>0:
+        cheapest = filtered.iloc[0]
+        st.success(f"✅ SABSE SASTA: {cheapest['Haulier']} — £{cheapest['Total £']:.0f} total ({pallets} x £{cheapest['Rate £']}) — Email: {cheapest['Email']}")
+        st.session_state["chosen_haulier"] = cheapest["Haulier"]
+        st.session_state["chosen_email"] = cheapest["Email"]
+        st.session_state["chosen_total"] = float(cheapest["Total £"])
+        st.session_state["chosen_service"] = service
+        st.session_state["chosen_from"] = from_loc
+        st.session_state["chosen_to"] = to_loc
+        st.session_state["chosen_product"] = product_r
+        st.session_state["chosen_pallets"] = pallets
+        st.session_state["chosen_weight"] = weight
+
+        if st.button(f"➡️ Is Saste Haulier Ko Email Karo - {cheapest['Haulier']}"):
+            st.info("Ab neeche wale Tabs (2,3,4) me jao — To me yehi haulier ka email auto aa jayega. Wahan product/weight/pallets badal kar email banao.")
+
+    st.markdown("### ✏️ Rates Update Karo (Jab Naya Quote Aaye)")
+    st.write("Agar kisi haulier ne naya rate diya hai to yahan badal do, agle dafa se wahi rate dikhega:")
+    edited = st.data_editor(st.session_state.rates, num_rows="dynamic", use_container_width=True, key="rate_editor")
+    if st.button("Save Rates"):
+        st.session_state.rates = edited
+        st.success("Rates save ho gaye!")
 
 with tab1:
-    st.subheader("Container Delivery Quote - Port to Warehouse")
+    st.subheader("Container Delivery Quote")
+    # Pre-fill from rates tab if chosen
+    def_email = st.session_state.get("chosen_email","enquiries@armourtransport.co.uk") if st.session_state.get("chosen_service")=="Container 40FT" else "enquiries@armourtransport.co.uk"
     c1,c2 = st.columns(2)
     with c1:
         container_no = st.text_input("Container Number", "ZCSU6684045")
-        size = st.selectbox("Size", ["40 FT","20 FT","40 FT HC"], index=0)
-        product = st.text_input("Product", "Date Syrup")
+        size = st.selectbox("Size", ["40 FT","20 FT","40 FT HC"])
+        product = st.text_input("Product", st.session_state.get("chosen_product","Date Syrup"))
         net_w = st.number_input("Net Weight MT", value=24.0)
         gross_w = st.number_input("Gross Weight MT", value=25.3)
-        port = st.selectbox("Collection Port", ["London Gateway","Felixstowe","Southampton"])
+        port = st.selectbox("Collection Port", PORTS, index=2)
         line = st.text_input("Shipping Line", "ZIM")
     with c2:
         date = st.text_input("Delivery Date", "19.10.2026")
         time = st.text_input("Slot Time", "8am")
         wh_key = st.selectbox("Delivery Warehouse", list(WAREHOUSES.keys()), index=1)
-        to_email = st.text_input("Haulier Email (To)", "enquiries@armourtransport.co.uk")
+        to_email = st.text_input("Haulier Email (To) - Rates tab se auto aaya", def_email)
+        ref_rate = st.text_input("Rate Reference (optional)", f"Your quoted rate £{st.session_state.get('chosen_total','')} - please confirm" if st.session_state.get("chosen_total") else "")
     body1 = f"""Hi,
 
-Can you please quote us for the delivery of the container:
+Can you please quote / confirm us for the delivery of the container:
 
 Container: {container_no}
 Size: {size}
@@ -73,31 +133,28 @@ Collection Port: {port}
 Shipping Line: {line}
 Delivery Date & Time: {date} {time}
 Delivery Address: {WAREHOUSES[wh_key]}
+Rate Reference: {ref_rate}
 
 Regards,
 Ali
 Sahara UK Foods"""
-    st.text_area("Live Preview - Email", body1, height=260)
-    st.checkbox("✅ I have checked - approve to open in Outlook", key="chk1")
-    if st.button("Open in Outlook - Container", key="btn1"):
+    st.text_area("Live Preview", body1, height=280)
+    st.checkbox("✅ I have checked - approve", key="chk1")
+    if st.button("Open in Outlook - Container"):
         if not st.session_state.chk1:
-            st.warning("Pehle checkbox tick karo - I have checked")
+            st.warning("Pehle checkbox tick karo")
         else:
-            subj = urllib.parse.quote(f"Container Delivery Quote - {container_no} - {port} to {wh_key}")
-            link = f"mailto:{to_email}?subject={subj}&body={urllib.parse.quote(body1)}"
-            st.markdown(f"[👉 Outlook me Kholo - Click Here]({link})")
-            st.info("Email auto-send NAHI hogi. Outlook khulega, aap khud Send daboge.")
+            link = f"mailto:{to_email}?subject={urllib.parse.quote(f'Container Delivery Quote - {container_no} - {port} to {wh_key}')}&body={urllib.parse.quote(body1)}"
+            st.markdown(f"[👉 Outlook me Kholo]({link})")
 
 with tab2:
-    st.subheader("NI / Ireland Pallet - 1 ya 2 Collection Points")
+    st.subheader("NI / Ireland Pallet")
     mode = st.radio("Collection Mode", ["2 Collection Points","1 Collection Point"])
     c1,c2 = st.columns(2)
     with c1:
         prod1 = st.text_input("Collection 1 - Product", "Chopped Aseel Dates")
         qty1 = st.number_input("Collection 1 - Pallets", value=15)
         col1 = st.selectbox("Collection 1 Address", list(WAREHOUSES.keys()), index=1)
-        phone1 = st.text_input("Collection 1 Phone", "+44 1205 820248")
-        email1 = st.text_input("Collection 1 Email", "office@masonbrothersnorthend.co.uk")
     with c2:
         if mode=="2 Collection Points":
             prod2 = st.text_input("Collection 2 - Product", "Pitted Aseel Dates")
@@ -106,49 +163,34 @@ with tab2:
         else:
             prod2=""; qty2=0; col2=""
     total_p = qty1 + (qty2 if mode=="2 Collection Points" else 0)
-    del_key = st.selectbox("Delivery Address - NI", list(WAREHOUSES.keys()), index=8)
-    del_email = st.text_input("Delivery Email", "aplatt@wgbuchanan.com")
-    del_phone = st.text_input("Delivery Phone", "02893 357812")
+    del_key = st.selectbox("Delivery - NI", list(WAREHOUSES.keys()), index=8)
+    to_email2 = st.text_input("Haulier Email", st.session_state.get("chosen_email","sales@barringtonfreight.co.uk") if st.session_state.get("chosen_service")=="NI / Ireland Pallet" else "sales@barringtonfreight.co.uk")
     body2 = f"""Hi,
 
 Can you please quote us for the following?
 
-Product: Dates
-Weight: 26 MT
+Product: Dates - {prod1} / {prod2}
+Weight: {st.session_state.get('chosen_weight',26)} MT
 Pallets: {total_p}
 Dimension: 100*120*100
 Pickup Date: TBC
 Delivery Date: TBC
+Rate Reference: £{st.session_state.get('chosen_total','')} - please confirm
 
-You need to pick the load from {'two points:' if mode=='2 Collection Points' else 'one point:'}
-
-{prod1}
-Quantity: {qty1} Pallets
-Pick-up Address: {WAREHOUSES[col1]}
-Phone: {phone1}
-Email: {email1}
+Collections:
+{prod1} - {qty1} Pallets - {WAREHOUSES[col1]}
 """
     if mode=="2 Collection Points":
-        body2 += f"""
-{prod2}
-Quantity: {qty2} Pallets
-Pick-up Address: {WAREHOUSES[col2]}
-"""
+        body2 += f"{prod2} - {qty2} Pallets - {WAREHOUSES[col2]}\n"
     body2 += f"""
-Delivery Address:
-{WAREHOUSES[del_key]}
-{del_email}
-Call: {del_phone}
-
-Regards,
-Ali"""
-    st.text_area("Live Preview - NI Email", body2, height=320)
-    st.checkbox("✅ I have checked - approve", key="chk2")
-    if st.button("Open in Outlook - NI", key="btn2"):
-        if not st.session_state.chk2:
-            st.warning("Pehle checkbox tick karo")
+Delivery: {WAREHOUSES[del_key]}
+Regards, Ali"""
+    st.text_area("Live Preview - NI", body2, height=300)
+    st.checkbox("✅ I have checked", key="chk2")
+    if st.button("Open in Outlook - NI"):
+        if not st.session_state.chk2: st.warning("Tick karo")
         else:
-            link = f"mailto:?subject={urllib.parse.quote('Quote - NI / Ireland Pallet Delivery')}&body={urllib.parse.quote(body2)}"
+            link = f"mailto:{to_email2}?subject={urllib.parse.quote('Quote - NI / Ireland Pallet')}&body={urllib.parse.quote(body2)}"
             st.markdown(f"[👉 Outlook me Kholo]({link})")
 
 with tab3:
@@ -157,19 +199,20 @@ with tab3:
     with c1:
         to_name = st.text_input("To Name", "Mark")
         del_date = st.text_input("Delivery Date", "5th Nov")
-        rotation = st.text_input("Rotation / Pallet Number", "0700697 (48 Cartons)")
-        cont_ref = st.text_input("Container Ref No", "HLBU9466308")
-        code = st.text_input("Sahara Product Code", "SUFL7251")
-        desc = st.text_input("Description", "Org. Chopped Aseel Dates")
+        rotation = st.text_input("Rotation", "0700697 (48 Cartons)")
+        cont_ref = st.text_input("Container Ref", "HLBU9466308")
+        code = st.text_input("Sahara Code", "SUFL7251")
+        desc = st.text_input("Description", st.session_state.get("chosen_product","Org. Chopped Aseel Dates"))
     with c2:
         lot = st.text_input("Lot No", "2151/AACHRF")
         qty = st.text_input("Quantity", "48 Cartons of 10Kg each /480kg/0.48MT")
-        pallets = st.number_input("Pallets", value=1)
+        pallets3 = st.number_input("Pallets", value=int(st.session_state.get("chosen_pallets",1)))
         po = st.text_input("PO Number", "12196")
         coll = st.selectbox("Collection Warehouse", list(WAREHOUSES.keys()), index=1)
         client = st.text_input("Client Name", "Food Republic")
-        client_addr = st.text_area("Client Delivery Address", "Unit 3 Stewarts Lane Depot, Silverthorne Road, Battersea, London, SW8 3HE")
+        client_addr = st.text_area("Client Address", "Unit 3 Stewarts Lane Depot, Silverthorne Road, Battersea, London, SW8 3HE")
         client_email = st.text_input("Client Email", "JOE@FOOD-REPUBLIC.COM")
+    haulier_email3 = st.text_input("Haulier Email (agar haulier ko bhejni hai)", st.session_state.get("chosen_email",""))
     body3 = f"""Hi {to_name},
 
 Can you please quote us for the delivery below to our client on {del_date}?
@@ -177,40 +220,32 @@ Can you please quote us for the delivery below to our client on {del_date}?
 Rotation/Pallet number: {rotation}
 Container Ref No: {cont_ref}
 Sahara Product Code: {code}
-Description of Goods: {desc}
+Description: {desc}
 Lot No: {lot}
 Quantity: {qty}
-Pallet: {pallets} Pallet
+Pallet: {pallets3} Pallet
 PO Number: {po}
 Collection: {WAREHOUSES[coll]}
+Rate Reference: £{st.session_state.get('chosen_total','')} - please confirm
 
-Delivery Address:
+Delivery:
 {client}
 {client_addr}
-
 Email: {client_email}
 
-Regards,
-Ali"""
-    st.text_area("Live Preview - UK Pallet Email", body3, height=300)
-    st.checkbox("✅ I have checked - approve", key="chk3")
-    if st.button("Open in Outlook - UK Pallet", key="btn3"):
-        if not st.session_state.chk3:
-            st.warning("Pehle checkbox tick karo")
+Regards, Ali"""
+    st.text_area("Live Preview - UK Pallet", body3, height=300)
+    st.checkbox("✅ I have checked", key="chk3")
+    if st.button("Open in Outlook - UK Pallet"):
+        if not st.session_state.chk3: st.warning("Tick karo")
         else:
-            link = f"mailto:{client_email}?subject={urllib.parse.quote(f'Quote - Pallet Delivery to {client} - {del_date}')}&body={urllib.parse.quote(body3)}"
+            to_final = haulier_email3 if haulier_email3 else client_email
+            link = f"mailto:{to_final}?subject={urllib.parse.quote(f'Quote - Pallet to {client} - {del_date}')}&body={urllib.parse.quote(body3)}"
             st.markdown(f"[👉 Outlook me Kholo]({link})")
 
 with tab4:
-    st.subheader("All Haulier Emails - Copy karke contact karo")
-    for name, email, typ in HAULIERS:
-        colA,colB,colC = st.columns([3,3,2])
-        colA.write(f"**{name}**")
-        colB.code(email)
-        colC.write(typ)
-    st.info("Tip: Email select karke Ctrl+C se copy karo, ya Outlook me paste karo.")
-    st.markdown("### Warehouses")
+    st.subheader("All Haulier Emails")
+    st.dataframe(st.session_state.rates[["Haulier","Email","Service","Rate £","Unit"]], use_container_width=True)
+    st.write("Warehouses:")
     for k,v in WAREHOUSES.items():
-        st.write(f"- **{k}** : {v}")
-    st.markdown("### Ports")
-    st.write("- Felixstowe | Southampton | London Gateway")
+        st.write(f"- {k} : {v}")
