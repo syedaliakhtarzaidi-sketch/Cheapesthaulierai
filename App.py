@@ -51,10 +51,14 @@ with tab_rates:
     st.info("👉 Kaise kaam karta hai: Neeche From / To / Pallets / Weight dalo → Sabse sasta haulier uppar aa jayega → Uske neeche wale 'Email This Haulier' button se usi rate ke saath email ban jayegi. Product / Weight / Pallets har dafa change ho sakte hain, rate auto-update ho jayega.")
     colA,colB,colC,colD = st.columns(4)
     with colA:
-        from_loc = st.selectbox("From", PORTS + list(WAREHOUSES.keys()), index=2)
+        from_loc = st.selectbox("From", PORTS + list(WAREHOUSES.keys()) + ["✏️ Custom - Client / Other Address (Neeche Likho)"], index=3)
+        if from_loc.startswith("✏️"):
+            from_loc = st.text_input("From - Custom Address Likho", "PE2 7LB - JSD warehouse")
         service = st.selectbox("Service Type", ["UK Pallet","Container 40FT","NI / Ireland Pallet","FTL Full Trailer","UK to Europe Pallet"])
     with colB:
-        to_loc = st.selectbox("To", list(WAREHOUSES.keys()), index=1)
+        to_loc = st.selectbox("To", list(WAREHOUSES.keys()) + ["✏️ Custom - Client Address (Neeche Likho - e.g. Food Republic, Battersea)"], index=1)
+        if to_loc.startswith("✏️"):
+            to_loc = st.text_input("To - Client Address Likho", "Food Republic, Unit 3 Stewarts Lane Depot, Silverthorne Road, Battersea, London, SW8 3HE")
     with colC:
         pallets = st.number_input("No. of Pallets (agar pallet hai)", min_value=1, value=1)
         weight = st.number_input("Total Weight MT", min_value=0.1, value=0.48)
